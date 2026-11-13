@@ -1,0 +1,10 @@
+Hertzline helper
+Copyright (c) 2026 Hertzline
+
+This product includes third-party software. Licenses below were verified from
+official package metadata at implementation time (2026-11-13).
+
+## Rust / crates.io
+
+- serde 1.0.229 -- MIT OR Apache-2.0 (https://crates.io/crates/serde)
+- serde_json 1.0.154 -- MIT OR Apache-2.0 (https://crates.io/crates/serde_json)

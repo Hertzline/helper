@@ -1,0 +1,16 @@
+[package]
+name = "hertzline-helper"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Privileged allow-list broker for Hertzline (spike D2)"
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[[bin]]
+name = "hertzline-helper"
+path = "src/main.rs"

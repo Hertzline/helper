@@ -1,0 +1,56 @@
+# HZ-005 D2 helper spike CI. Actions pinned to commit SHAs (REPOS.md / RULES.md).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  helper-test:
+    name: helper-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: stable
+
+      - name: Test
+        run: cargo test --locked
+
+      - name: Release build
+        run: cargo build --release --locked
+
+      - name: Smoke allow-list CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            bin="target/release/hertzline-helper.exe"
+          else
+            bin="target/release/hertzline-helper"
+          fi
+          test -x "${bin}" || test -f "${bin}"
+          "${bin}" ping | tee /tmp/hertzline-d2-ping.txt
+          grep -q "helper_pong" /tmp/hertzline-d2-ping.txt
+          set +e
+          "${bin}" definitely_not_an_op
+          code=$?
+          set -e
+          test "${code}" -eq 2
+          "${bin}" probe_elevate_path --json | tee /tmp/hertzline-d2-probe.json
+          grep -q "elevate_path\|mechanism\|accepted" /tmp/hertzline-d2-probe.json
+          size="$(wc -c < "${bin}" | tr -d ' ')"
+          echo "d2_smoke_ok path=${bin} size=${size}"
