@@ -25,7 +25,10 @@ fn print_usage() {
               get_game_bar|set_game_bar|preview_cleanup|apply_cleanup|\n\
               get_storage_health|get_driver_info|get_display|set_display_refresh|\n\
               get_feral_gamemode|set_feral_gamemode|get_energy_profile|set_energy_profile|\n\
-              get_nice_ionice|set_nice_ionice\n\
+              get_nice_ionice|set_nice_ionice|\n\
+              get_macos_game_mode|get_macos_lpm|macos_close_background_app|\n\
+              macos_pause_background_app|macos_resume_background_app|\n\
+              get_macos_display|set_macos_display_refresh\n\
          create_restore_point: --reason is the restore point description (Windows only)\n\
          set_power_plan: --reason is scheme GUID (default High performance)\n\
          set_game_mode: --reason 0|1 (default 1)\n\
@@ -39,6 +42,10 @@ fn print_usage() {
          get/set_feral_gamemode: --reason pid[;op=register|unregister] (Linux)\n\
          set_energy_profile: --reason profile (ppd performance|balanced|power-saver, or tuned name)\n\
          get/set_nice_ionice: --reason pid[;nice=N;ioprio_class=C;ioprio_level=L]; set needs elevation\n\
+         get_macos_game_mode: status always not_possible via public APIs\n\
+         get_macos_lpm: --reason performance=1 to attach AC-4.21 warning when LPM active\n\
+         macos_close/pause/resume_background_app: --reason pid (user-chosen only)\n\
+         set_macos_display_refresh: --reason Hz (e.g. 60)\n\
          unknown ops are rejected (exit 2)"
     );
 }

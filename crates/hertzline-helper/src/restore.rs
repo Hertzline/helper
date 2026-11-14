@@ -32,6 +32,7 @@ pub fn restore_all_for_trigger(trigger: &str) -> RestoreReport {
     let mut registry = MapActionRegistry::new();
     crate::windows_settings::register_windows_actions(&mut registry);
     crate::linux_settings::register_linux_actions(&mut registry);
+    crate::macos_settings::register_macos_actions(&mut registry);
     match restore_all_at_default_path(&mut registry, parsed) {
         Ok(report) => to_report(&path, report),
         Err(err) => RestoreReport {
@@ -52,6 +53,7 @@ pub fn restore_all_at(store_path: &Path, trigger: &str) -> RestoreReport {
     let mut registry = MapActionRegistry::new();
     crate::windows_settings::register_windows_actions(&mut registry);
     crate::linux_settings::register_linux_actions(&mut registry);
+    crate::macos_settings::register_macos_actions(&mut registry);
     if !store_path.exists() {
         return RestoreReport {
             trigger: parsed.as_str().into(),

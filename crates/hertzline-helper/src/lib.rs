@@ -4,6 +4,7 @@
 
 pub mod elevate;
 pub mod linux_settings;
+pub mod macos_settings;
 pub mod protocol;
 pub mod restore;
 pub mod system_restore;
@@ -161,6 +162,34 @@ pub fn dispatch(request: &HelperRequest) -> HelperResponse {
             let report = linux_settings::set_nice_ionice(request.reason.as_deref());
             linux_setting_response("set_nice_ionice", &report)
         }
+        HelperOp::GetMacOsGameMode => {
+            let report = macos_settings::get_macos_game_mode();
+            macos_setting_response("get_macos_game_mode", &report)
+        }
+        HelperOp::GetMacOsLpm => {
+            let report = macos_settings::get_macos_lpm(request.reason.as_deref());
+            macos_setting_response("get_macos_lpm", &report)
+        }
+        HelperOp::MacOsCloseBackgroundApp => {
+            let report = macos_settings::macos_close_background_app(request.reason.as_deref());
+            macos_setting_response("macos_close_background_app", &report)
+        }
+        HelperOp::MacOsPauseBackgroundApp => {
+            let report = macos_settings::macos_pause_background_app(request.reason.as_deref());
+            macos_setting_response("macos_pause_background_app", &report)
+        }
+        HelperOp::MacOsResumeBackgroundApp => {
+            let report = macos_settings::macos_resume_background_app(request.reason.as_deref());
+            macos_setting_response("macos_resume_background_app", &report)
+        }
+        HelperOp::GetMacOsDisplay => {
+            let report = macos_settings::get_macos_display();
+            macos_setting_response("get_macos_display", &report)
+        }
+        HelperOp::SetMacOsDisplayRefresh => {
+            let report = macos_settings::set_macos_display_refresh(request.reason.as_deref());
+            macos_setting_response("set_macos_display_refresh", &report)
+        }
     }
 }
 
@@ -169,6 +198,10 @@ fn setting_response(detail: &str, report: &windows_settings::SettingReport) -> H
 }
 
 fn linux_setting_response(detail: &str, report: &linux_settings::SettingReport) -> HelperResponse {
+    finish_setting_response(detail, &report.status, report)
+}
+
+fn macos_setting_response(detail: &str, report: &macos_settings::SettingReport) -> HelperResponse {
     finish_setting_response(detail, &report.status, report)
 }
 
@@ -383,5 +416,46 @@ mod tests {
             reason: Some(std::process::id().to_string()),
         });
         assert!(nice.payload.is_some());
+    }
+
+    #[test]
+    fn hz026_ops_on_allow_list() {
+        for token in [
+            "get_macos_game_mode",
+            "get_macos_lpm",
+            "macos_close_background_app",
+            "macos_pause_background_app",
+            "macos_resume_background_app",
+            "get_macos_display",
+            "set_macos_display_refresh",
+        ] {
+            assert!(parse_op_token(token).is_ok(), "{token}");
+        }
+        let gm = dispatch(&HelperRequest {
+            op: HelperOp::GetMacOsGameMode,
+            reason: None,
+        });
+        assert!(gm.payload.is_some());
+        let lpm = dispatch(&HelperRequest {
+            op: HelperOp::GetMacOsLpm,
+            reason: Some("performance=1".into()),
+        });
+        assert!(lpm.payload.is_some());
+        let display = dispatch(&HelperRequest {
+            op: HelperOp::GetMacOsDisplay,
+            reason: None,
+        });
+        assert!(display.payload.is_some());
+        #[cfg(not(target_os = "macos"))]
+        {
+            assert!(gm.accepted);
+            assert!(lpm.accepted);
+            assert!(display.accepted);
+            let set = dispatch(&HelperRequest {
+                op: HelperOp::SetMacOsDisplayRefresh,
+                reason: Some("60".into()),
+            });
+            assert!(!set.accepted);
+        }
     }
 }

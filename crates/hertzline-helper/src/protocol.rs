@@ -70,6 +70,20 @@ pub enum HelperOp {
     GetNiceIonice,
     /// Set nice + ionice for a PID (AC-4.13). Arg = pid;nice=N;ioprio_class=C;ioprio_level=L. Elevation when nice < 0.
     SetNiceIonice,
+    /// Read macOS Game Mode status (AC-4.19). Always not_possible via public APIs.
+    GetMacOsGameMode,
+    /// Read macOS Low Power Mode + optional perf warning (AC-4.21). Arg = performance=1.
+    GetMacOsLpm,
+    /// Close a user-chosen macOS background PID (AC-4.20). Arg = pid.
+    MacOsCloseBackgroundApp,
+    /// Pause a user-chosen macOS background PID (AC-4.20). Arg = pid.
+    MacOsPauseBackgroundApp,
+    /// Resume a paused macOS background PID (AC-4.20). Arg = pid.
+    MacOsResumeBackgroundApp,
+    /// Read macOS main display refresh (AC-4.22). No elevation.
+    GetMacOsDisplay,
+    /// Set macOS display refresh Hz (AC-4.22). Arg = Hz.
+    SetMacOsDisplayRefresh,
 }
 
 impl HelperOp {
@@ -105,6 +119,13 @@ impl HelperOp {
         HelperOp::SetEnergyProfile,
         HelperOp::GetNiceIonice,
         HelperOp::SetNiceIonice,
+        HelperOp::GetMacOsGameMode,
+        HelperOp::GetMacOsLpm,
+        HelperOp::MacOsCloseBackgroundApp,
+        HelperOp::MacOsPauseBackgroundApp,
+        HelperOp::MacOsResumeBackgroundApp,
+        HelperOp::GetMacOsDisplay,
+        HelperOp::SetMacOsDisplayRefresh,
     ];
 
     pub fn as_token(self) -> &'static str {
@@ -140,6 +161,13 @@ impl HelperOp {
             HelperOp::SetEnergyProfile => "set_energy_profile",
             HelperOp::GetNiceIonice => "get_nice_ionice",
             HelperOp::SetNiceIonice => "set_nice_ionice",
+            HelperOp::GetMacOsGameMode => "get_macos_game_mode",
+            HelperOp::GetMacOsLpm => "get_macos_lpm",
+            HelperOp::MacOsCloseBackgroundApp => "macos_close_background_app",
+            HelperOp::MacOsPauseBackgroundApp => "macos_pause_background_app",
+            HelperOp::MacOsResumeBackgroundApp => "macos_resume_background_app",
+            HelperOp::GetMacOsDisplay => "get_macos_display",
+            HelperOp::SetMacOsDisplayRefresh => "set_macos_display_refresh",
         }
     }
 
@@ -176,6 +204,13 @@ impl HelperOp {
             "set_energy_profile" => Some(HelperOp::SetEnergyProfile),
             "get_nice_ionice" => Some(HelperOp::GetNiceIonice),
             "set_nice_ionice" => Some(HelperOp::SetNiceIonice),
+            "get_macos_game_mode" => Some(HelperOp::GetMacOsGameMode),
+            "get_macos_lpm" => Some(HelperOp::GetMacOsLpm),
+            "macos_close_background_app" => Some(HelperOp::MacOsCloseBackgroundApp),
+            "macos_pause_background_app" => Some(HelperOp::MacOsPauseBackgroundApp),
+            "macos_resume_background_app" => Some(HelperOp::MacOsResumeBackgroundApp),
+            "get_macos_display" => Some(HelperOp::GetMacOsDisplay),
+            "set_macos_display_refresh" => Some(HelperOp::SetMacOsDisplayRefresh),
             _ => None,
         }
     }
@@ -249,6 +284,27 @@ impl HelperOp {
             }
             HelperOp::SetNiceIonice => {
                 "Hertzline set nice/ionice for a user-chosen PID (may need CAP_SYS_NICE)"
+            }
+            HelperOp::GetMacOsGameMode => {
+                "Hertzline report macOS Game Mode status (no public API; no elevation)"
+            }
+            HelperOp::GetMacOsLpm => {
+                "Hertzline report macOS Low Power Mode and warn if performance work requested (no elevation)"
+            }
+            HelperOp::MacOsCloseBackgroundApp => {
+                "Hertzline close a user-chosen macOS background app (no elevation)"
+            }
+            HelperOp::MacOsPauseBackgroundApp => {
+                "Hertzline pause a user-chosen macOS background app (no elevation)"
+            }
+            HelperOp::MacOsResumeBackgroundApp => {
+                "Hertzline resume a user-chosen macOS background app (no elevation)"
+            }
+            HelperOp::GetMacOsDisplay => {
+                "Hertzline report macOS display refresh rate (no elevation)"
+            }
+            HelperOp::SetMacOsDisplayRefresh => {
+                "Hertzline set macOS display refresh rate (no elevation)"
             }
         }
     }
@@ -375,5 +431,16 @@ mod tests {
         assert!(!HelperOp::SetEnergyProfile.requires_elevation());
         assert!(!HelperOp::GetNiceIonice.requires_elevation());
         assert!(HelperOp::SetNiceIonice.requires_elevation());
+    }
+
+    #[test]
+    fn hz026_ops_no_elevation() {
+        assert!(!HelperOp::GetMacOsGameMode.requires_elevation());
+        assert!(!HelperOp::GetMacOsLpm.requires_elevation());
+        assert!(!HelperOp::MacOsCloseBackgroundApp.requires_elevation());
+        assert!(!HelperOp::MacOsPauseBackgroundApp.requires_elevation());
+        assert!(!HelperOp::MacOsResumeBackgroundApp.requires_elevation());
+        assert!(!HelperOp::GetMacOsDisplay.requires_elevation());
+        assert!(!HelperOp::SetMacOsDisplayRefresh.requires_elevation());
     }
 }
