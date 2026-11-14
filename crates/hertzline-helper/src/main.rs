@@ -1,14 +1,15 @@
 //! CLI entry for the privileged helper binary.
 //!
 //! Usage:
-//!   hertzline-helper <op> [--reason TEXT] [--json]
+//!   hertzline-helper <op> [--reason TEXT] [--store PATH] [--json]
 //!
 //! Ops are allow-listed. Unknown tokens exit 2 without elevation.
+//! `--store` sets `HERTZLINE_SNAPSHOT_STORE` for restore_all (uninstall/tests).
 
 use hertzline_helper::{
     dispatch, elevate, parse_op_token,
-    protocol::{HelperRequest, HelperResponse},
-    CRATE_VERSION,
+    protocol::{HelperOp, HelperRequest, HelperResponse},
+    restore, CRATE_VERSION,
 };
 use std::env;
 use std::process::ExitCode;
@@ -16,7 +17,7 @@ use std::process::ExitCode;
 fn print_usage() {
     eprintln!(
         "hertzline-helper {CRATE_VERSION}\n\
-         usage: hertzline-helper <ping|probe_elevate_path|restore_all> [--reason TEXT] [--json]\n\
+         usage: hertzline-helper <ping|probe_elevate_path|restore_all> [--reason TEXT] [--store PATH] [--json]\n\
          unknown ops are rejected (exit 2)"
     );
 }
@@ -36,6 +37,7 @@ fn main() -> ExitCode {
     args.retain(|a| a != "--json");
 
     let mut reason: Option<String> = None;
+    let mut store: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         if args[i] == "--reason" {
@@ -44,6 +46,15 @@ fn main() -> ExitCode {
                 return ExitCode::from(2);
             }
             reason = Some(args[i + 1].clone());
+            args.drain(i..=i + 1);
+            continue;
+        }
+        if args[i] == "--store" {
+            if i + 1 >= args.len() {
+                eprintln!("error: --store needs a value");
+                return ExitCode::from(2);
+            }
+            store = Some(args[i + 1].clone());
             args.drain(i..=i + 1);
             continue;
         }
@@ -67,10 +78,26 @@ fn main() -> ExitCode {
         }
     };
 
+    if let Some(path) = store {
+        env::set_var(restore::env_store_override(), path);
+    }
+
     // Resolve launch plan for observability; elevation is not auto-prompted here.
     let _launch = elevate::resolve_launch(op);
 
-    let res = dispatch(&HelperRequest { op, reason });
+    // restore_all: partial (missing handlers) stays accepted so uninstall can
+    // continue after logging; hard load errors reject (exit 1).
+    let res = if op == HelperOp::RestoreAll {
+        let trigger = reason.as_deref().unwrap_or("explicit");
+        let report = restore::restore_all(trigger);
+        let mut response = HelperResponse::ok_json("restore_all", &report);
+        if report.status == "error" {
+            response.accepted = false;
+        }
+        response
+    } else {
+        dispatch(&HelperRequest { op, reason })
+    };
     emit(&res, json);
     if res.accepted {
         ExitCode::SUCCESS

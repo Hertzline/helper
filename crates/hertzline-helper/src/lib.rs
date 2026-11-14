@@ -71,7 +71,7 @@ mod tests {
     }
 
     #[test]
-    fn restore_all_stub_reports_trigger() {
+    fn restore_all_reports_trigger_headless() {
         let res = dispatch(&HelperRequest {
             op: HelperOp::RestoreAll,
             reason: Some("crash".into()),
@@ -79,6 +79,7 @@ mod tests {
         assert!(res.accepted);
         let report = restore::restore_all("crash");
         assert_eq!(report.trigger, "crash");
-        assert!(report.requires_ui == false);
+        assert!(!report.requires_ui);
+        assert!(report.status == "ok" || report.status == "partial" || report.status == "error");
     }
 }

@@ -1,4 +1,5 @@
-# HZ-005 D2 helper spike CI. Actions pinned to commit SHAs (REPOS.md / RULES.md).
+# Helper CI. Actions pinned to commit SHAs (REPOS.md / RULES.md).
+# Checks out Hertzline/core as a sibling for the path dependency.
 name: ci
 
 on:
@@ -14,13 +15,24 @@ jobs:
   helper-test:
     name: helper-test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: helper
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
-      - name: Checkout
+      - name: Checkout helper
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: helper
+
+      - name: Checkout core sibling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Hertzline/core
+          path: core
 
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
@@ -52,5 +64,8 @@ jobs:
           test "${code}" -eq 2
           "${bin}" probe_elevate_path --json | tee /tmp/hertzline-d2-probe.json
           grep -q "elevate_path\|mechanism\|accepted" /tmp/hertzline-d2-probe.json
+          "${bin}" restore_all --reason uninstall --json | tee /tmp/hertzline-hz018-restore.json
+          grep -q "requires_ui" /tmp/hertzline-hz018-restore.json
+          grep -q '"ok"' /tmp/hertzline-hz018-restore.json
           size="$(wc -c < "${bin}" | tr -d ' ')"
           echo "d2_smoke_ok path=${bin} size=${size}"

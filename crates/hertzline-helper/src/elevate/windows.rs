@@ -17,10 +17,12 @@ pub fn plan() -> ElevatePlan {
         source_url: "https://learn.microsoft.com/en-us/windows/win32/shell/launch".into(),
         always_on_service: false,
         notes: vec![
-            "Desktop app stays unelevated; only hertzline-helper.exe is relaunched elevated.".into(),
+            "Desktop app stays unelevated; only hertzline-helper.exe is relaunched elevated."
+                .into(),
             "UAC consent shows the helper path and the human-readable reason for the op.".into(),
             "Prefer batching privileged restores into one elevated helper invocation.".into(),
-            "Windows service rejected for v1: always-on privilege without spike justification.".into(),
+            "Windows service rejected for v1: always-on privilege without spike justification."
+                .into(),
         ],
     }
 }
