@@ -6,6 +6,7 @@ pub mod elevate;
 pub mod protocol;
 pub mod restore;
 pub mod system_restore;
+pub mod windows_settings;
 
 pub const CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -31,7 +32,52 @@ pub fn dispatch(request: &HelperRequest) -> HelperResponse {
             }
             response
         }
+        HelperOp::GetPowerPlan => {
+            let report = windows_settings::get_power_plan();
+            setting_response("get_power_plan", &report)
+        }
+        HelperOp::SetPowerPlan => {
+            let report = windows_settings::set_power_plan(request.reason.as_deref());
+            setting_response("set_power_plan", &report)
+        }
+        HelperOp::GetGameMode => {
+            let report = windows_settings::get_game_mode();
+            setting_response("get_game_mode", &report)
+        }
+        HelperOp::SetGameMode => {
+            // Default when reason omitted: enable (action target).
+            let enabled = match request.reason.as_deref().map(str::trim) {
+                None | Some("1") | Some("on") | Some("true") => true,
+                Some("0") | Some("off") | Some("false") => false,
+                Some(other) => {
+                    return HelperResponse::rejected(format!(
+                        "set_game_mode reason must be 0 or 1, got {other}"
+                    ));
+                }
+            };
+            let report = windows_settings::set_game_mode(enabled);
+            setting_response("set_game_mode", &report)
+        }
+        HelperOp::GetHags => {
+            let report = windows_settings::get_hags();
+            setting_response("get_hags", &report)
+        }
+        HelperOp::SetHags => {
+            let report = windows_settings::set_hags(request.reason.as_deref());
+            setting_response("set_hags", &report)
+        }
     }
+}
+
+fn setting_response(detail: &str, report: &windows_settings::SettingReport) -> HelperResponse {
+    let mut response = HelperResponse::ok_json(detail, report);
+    if report.status == "failed" || report.status == "unavailable" {
+        response.accepted = false;
+    } else if report.status == "not_possible" {
+        // Get probes of unsupported settings still succeed; set/apply paths reject.
+        response.accepted = detail.starts_with("get_");
+    }
+    response
 }
 
 /// Parse a CLI op token into the allow-list. Anything else is rejected.
@@ -108,5 +154,35 @@ mod tests {
         });
         assert!(res.payload.is_some());
         assert_eq!(res.detail, "create_restore_point");
+    }
+
+    #[test]
+    fn hz020_ops_on_allow_list() {
+        for token in [
+            "get_power_plan",
+            "set_power_plan",
+            "get_game_mode",
+            "set_game_mode",
+            "get_hags",
+            "set_hags",
+        ] {
+            assert!(parse_op_token(token).is_ok(), "{token}");
+        }
+        let power = dispatch(&HelperRequest {
+            op: HelperOp::GetPowerPlan,
+            reason: None,
+        });
+        assert!(power.payload.is_some());
+        let game = dispatch(&HelperRequest {
+            op: HelperOp::GetGameMode,
+            reason: None,
+        });
+        assert!(game.payload.is_some());
+        let hags = dispatch(&HelperRequest {
+            op: HelperOp::GetHags,
+            reason: None,
+        });
+        assert!(hags.payload.is_some());
+        assert!(HelperOp::SetHags.requires_elevation());
     }
 }

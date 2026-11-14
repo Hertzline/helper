@@ -16,6 +16,18 @@ pub enum HelperOp {
     RestoreAll,
     /// Create a Windows System Restore point before system-level changes (AC-7.4).
     CreateRestorePoint,
+    /// Read active Windows power plan GUID (AC-4.1). No elevation.
+    GetPowerPlan,
+    /// Set active Windows power plan GUID (AC-4.1). No elevation. Arg = GUID.
+    SetPowerPlan,
+    /// Read Windows Game Mode (AC-4.2). No elevation.
+    GetGameMode,
+    /// Set Windows Game Mode (AC-4.2). No elevation. Arg = "0"|"1".
+    SetGameMode,
+    /// Read HAGS HwSchMode (AC-4.2). No elevation.
+    GetHags,
+    /// Set HAGS HwSchMode (AC-4.2). Elevation required. Arg = "1"|"2".
+    SetHags,
 }
 
 impl HelperOp {
@@ -24,6 +36,12 @@ impl HelperOp {
         HelperOp::ProbeElevatePath,
         HelperOp::RestoreAll,
         HelperOp::CreateRestorePoint,
+        HelperOp::GetPowerPlan,
+        HelperOp::SetPowerPlan,
+        HelperOp::GetGameMode,
+        HelperOp::SetGameMode,
+        HelperOp::GetHags,
+        HelperOp::SetHags,
     ];
 
     pub fn as_token(self) -> &'static str {
@@ -32,6 +50,12 @@ impl HelperOp {
             HelperOp::ProbeElevatePath => "probe_elevate_path",
             HelperOp::RestoreAll => "restore_all",
             HelperOp::CreateRestorePoint => "create_restore_point",
+            HelperOp::GetPowerPlan => "get_power_plan",
+            HelperOp::SetPowerPlan => "set_power_plan",
+            HelperOp::GetGameMode => "get_game_mode",
+            HelperOp::SetGameMode => "set_game_mode",
+            HelperOp::GetHags => "get_hags",
+            HelperOp::SetHags => "set_hags",
         }
     }
 
@@ -41,6 +65,12 @@ impl HelperOp {
             "probe_elevate_path" => Some(HelperOp::ProbeElevatePath),
             "restore_all" => Some(HelperOp::RestoreAll),
             "create_restore_point" => Some(HelperOp::CreateRestorePoint),
+            "get_power_plan" => Some(HelperOp::GetPowerPlan),
+            "set_power_plan" => Some(HelperOp::SetPowerPlan),
+            "get_game_mode" => Some(HelperOp::GetGameMode),
+            "set_game_mode" => Some(HelperOp::SetGameMode),
+            "get_hags" => Some(HelperOp::GetHags),
+            "set_hags" => Some(HelperOp::SetHags),
             _ => None,
         }
     }
@@ -54,11 +84,20 @@ impl HelperOp {
             HelperOp::CreateRestorePoint => {
                 "Hertzline create a Windows System Restore point before system changes"
             }
+            HelperOp::GetPowerPlan => "Hertzline read active Windows power plan (no elevation)",
+            HelperOp::SetPowerPlan => "Hertzline set active Windows power plan (no elevation)",
+            HelperOp::GetGameMode => "Hertzline read Windows Game Mode (no elevation)",
+            HelperOp::SetGameMode => "Hertzline set Windows Game Mode (no elevation)",
+            HelperOp::GetHags => "Hertzline read HAGS status (no elevation)",
+            HelperOp::SetHags => "Hertzline change Hardware-accelerated GPU scheduling (HwSchMode)",
         }
     }
 
     pub fn requires_elevation(self) -> bool {
-        matches!(self, HelperOp::RestoreAll | HelperOp::CreateRestorePoint)
+        matches!(
+            self,
+            HelperOp::RestoreAll | HelperOp::CreateRestorePoint | HelperOp::SetHags
+        )
     }
 }
 
@@ -130,5 +169,15 @@ mod tests {
         assert!(encoded.contains("restore_all"));
         let decoded: HelperRequest = serde_json::from_str(&encoded).expect("deserialize");
         assert_eq!(decoded, req);
+    }
+
+    #[test]
+    fn hz020_ops_elevation_flags() {
+        assert!(!HelperOp::GetPowerPlan.requires_elevation());
+        assert!(!HelperOp::SetPowerPlan.requires_elevation());
+        assert!(!HelperOp::GetGameMode.requires_elevation());
+        assert!(!HelperOp::SetGameMode.requires_elevation());
+        assert!(!HelperOp::GetHags.requires_elevation());
+        assert!(HelperOp::SetHags.requires_elevation());
     }
 }

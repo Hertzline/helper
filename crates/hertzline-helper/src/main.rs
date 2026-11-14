@@ -17,8 +17,13 @@ use std::process::ExitCode;
 fn print_usage() {
     eprintln!(
         "hertzline-helper {CRATE_VERSION}\n\
-         usage: hertzline-helper <ping|probe_elevate_path|restore_all|create_restore_point> [--reason TEXT] [--store PATH] [--json]\n\
+         usage: hertzline-helper <op> [--reason TEXT] [--store PATH] [--json]\n\
+         ops: ping|probe_elevate_path|restore_all|create_restore_point|\n\
+              get_power_plan|set_power_plan|get_game_mode|set_game_mode|get_hags|set_hags\n\
          create_restore_point: --reason is the restore point description (Windows only)\n\
+         set_power_plan: --reason is scheme GUID (default High performance)\n\
+         set_game_mode: --reason 0|1 (default 1)\n\
+         set_hags: --reason 1|2 (Off|On); requires elevation; reboot for effect\n\
          unknown ops are rejected (exit 2)"
     );
 }

@@ -93,4 +93,14 @@ mod tests {
         assert!(spec.requires_elevation);
         assert!(spec.elevation_reason.contains("System Restore"));
     }
+
+    #[test]
+    fn set_hags_marks_elevation() {
+        let spec = resolve_launch(HelperOp::SetHags);
+        assert!(spec.requires_elevation);
+        assert!(spec.elevation_reason.contains("HwSchMode"));
+        assert!(!resolve_launch(HelperOp::GetHags).requires_elevation);
+        assert!(!resolve_launch(HelperOp::SetPowerPlan).requires_elevation);
+        assert!(!resolve_launch(HelperOp::SetGameMode).requires_elevation);
+    }
 }
