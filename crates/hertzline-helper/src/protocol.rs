@@ -28,6 +28,20 @@ pub enum HelperOp {
     GetHags,
     /// Set HAGS HwSchMode (AC-4.2). Elevation required. Arg = "1"|"2".
     SetHags,
+    /// Read process priority/affinity (AC-4.3). Arg = pid. No elevation.
+    GetProcessPriority,
+    /// Set process priority/affinity (AC-4.3). Arg = pid;priority[=hex][;affinity=hex].
+    SetProcessPriority,
+    /// Close a user-chosen background PID (AC-4.4). Arg = pid[;restart=0|1].
+    CloseBackgroundApp,
+    /// Pause a user-chosen background PID (AC-4.4). Arg = pid.
+    PauseBackgroundApp,
+    /// Resume a paused user-chosen background PID (AC-4.4). Arg = pid.
+    ResumeBackgroundApp,
+    /// List current-user startup Run entries (AC-4.5). No elevation.
+    ListStartupApps,
+    /// Enable/disable a user-chosen startup entry (AC-4.5). Arg = name;enabled=0|1.
+    SetStartupApp,
 }
 
 impl HelperOp {
@@ -42,6 +56,13 @@ impl HelperOp {
         HelperOp::SetGameMode,
         HelperOp::GetHags,
         HelperOp::SetHags,
+        HelperOp::GetProcessPriority,
+        HelperOp::SetProcessPriority,
+        HelperOp::CloseBackgroundApp,
+        HelperOp::PauseBackgroundApp,
+        HelperOp::ResumeBackgroundApp,
+        HelperOp::ListStartupApps,
+        HelperOp::SetStartupApp,
     ];
 
     pub fn as_token(self) -> &'static str {
@@ -56,6 +77,13 @@ impl HelperOp {
             HelperOp::SetGameMode => "set_game_mode",
             HelperOp::GetHags => "get_hags",
             HelperOp::SetHags => "set_hags",
+            HelperOp::GetProcessPriority => "get_process_priority",
+            HelperOp::SetProcessPriority => "set_process_priority",
+            HelperOp::CloseBackgroundApp => "close_background_app",
+            HelperOp::PauseBackgroundApp => "pause_background_app",
+            HelperOp::ResumeBackgroundApp => "resume_background_app",
+            HelperOp::ListStartupApps => "list_startup_apps",
+            HelperOp::SetStartupApp => "set_startup_app",
         }
     }
 
@@ -71,6 +99,13 @@ impl HelperOp {
             "set_game_mode" => Some(HelperOp::SetGameMode),
             "get_hags" => Some(HelperOp::GetHags),
             "set_hags" => Some(HelperOp::SetHags),
+            "get_process_priority" => Some(HelperOp::GetProcessPriority),
+            "set_process_priority" => Some(HelperOp::SetProcessPriority),
+            "close_background_app" => Some(HelperOp::CloseBackgroundApp),
+            "pause_background_app" => Some(HelperOp::PauseBackgroundApp),
+            "resume_background_app" => Some(HelperOp::ResumeBackgroundApp),
+            "list_startup_apps" => Some(HelperOp::ListStartupApps),
+            "set_startup_app" => Some(HelperOp::SetStartupApp),
             _ => None,
         }
     }
@@ -90,6 +125,25 @@ impl HelperOp {
             HelperOp::SetGameMode => "Hertzline set Windows Game Mode (no elevation)",
             HelperOp::GetHags => "Hertzline read HAGS status (no elevation)",
             HelperOp::SetHags => "Hertzline change Hardware-accelerated GPU scheduling (HwSchMode)",
+            HelperOp::GetProcessPriority => {
+                "Hertzline read process priority/affinity (no elevation)"
+            }
+            HelperOp::SetProcessPriority => {
+                "Hertzline set process priority/affinity for a user-chosen PID (no elevation)"
+            }
+            HelperOp::CloseBackgroundApp => {
+                "Hertzline close a user-chosen background app (no elevation)"
+            }
+            HelperOp::PauseBackgroundApp => {
+                "Hertzline pause a user-chosen background app (no elevation)"
+            }
+            HelperOp::ResumeBackgroundApp => {
+                "Hertzline resume a user-chosen background app (no elevation)"
+            }
+            HelperOp::ListStartupApps => "Hertzline list current-user startup apps (no elevation)",
+            HelperOp::SetStartupApp => {
+                "Hertzline enable/disable a user-chosen startup app (no elevation)"
+            }
         }
     }
 
@@ -179,5 +233,16 @@ mod tests {
         assert!(!HelperOp::SetGameMode.requires_elevation());
         assert!(!HelperOp::GetHags.requires_elevation());
         assert!(HelperOp::SetHags.requires_elevation());
+    }
+
+    #[test]
+    fn hz021_ops_no_elevation() {
+        assert!(!HelperOp::GetProcessPriority.requires_elevation());
+        assert!(!HelperOp::SetProcessPriority.requires_elevation());
+        assert!(!HelperOp::CloseBackgroundApp.requires_elevation());
+        assert!(!HelperOp::PauseBackgroundApp.requires_elevation());
+        assert!(!HelperOp::ResumeBackgroundApp.requires_elevation());
+        assert!(!HelperOp::ListStartupApps.requires_elevation());
+        assert!(!HelperOp::SetStartupApp.requires_elevation());
     }
 }

@@ -1,7 +1,8 @@
-//! Windows power / Game Mode / HAGS helper ops (HZ-020).
+//! Windows settings helper ops (HZ-020 / HZ-021).
 //!
-//! Power plan and Game Mode are unprivileged (current user).
-//! HAGS write needs elevation (HKLM HwSchMode).
+//! Power plan, Game Mode, priority, background apps, and startup are
+//! unprivileged (current user / same-session process). HAGS write needs
+//! elevation (HKLM HwSchMode).
 
 use serde::{Deserialize, Serialize};
 
@@ -236,6 +237,347 @@ mod win {
             }
         }
     }
+
+    use hertzline_core::actions::windows::background::{
+        BackgroundAppsBackend, ACTION_ID as BG_ID, SOURCE_URL as BG_SRC,
+    };
+    use hertzline_core::actions::windows::priority::{
+        ProcessPriorityBackend, ACTION_ID as PRI_ID, HIGH_PRIORITY_CLASS, SOURCE_URL as PRI_SRC,
+    };
+    use hertzline_core::actions::windows::startup::{
+        StartupAppsBackend, StartupEntry, ACTION_ID as START_ID, SOURCE_URL as START_SRC,
+    };
+    use hertzline_core::actions::windows::{
+        background::os::OsBackgroundAppsBackend, priority::os::OsProcessPriorityBackend,
+        startup::os::OsStartupAppsBackend,
+    };
+
+    fn parse_pid(reason: &str) -> Result<u32, String> {
+        let first = reason.split(';').next().unwrap_or("").trim();
+        let token = first.strip_prefix("pid=").unwrap_or(first).trim();
+        token
+            .parse::<u32>()
+            .map_err(|_| format!("expected pid, got {reason}"))
+    }
+
+    pub fn get_process_priority(reason: &str) -> SettingReport {
+        let pid = match parse_pid(reason) {
+            Ok(pid) => pid,
+            Err(detail) => {
+                return SettingReport {
+                    os: "windows".into(),
+                    setting: PRI_ID.into(),
+                    status: "failed".into(),
+                    value: String::new(),
+                    detail,
+                    source_url: PRI_SRC.into(),
+                    requires_elevation: false,
+                };
+            }
+        };
+        match OsProcessPriorityBackend.read(pid) {
+            Ok(state) => SettingReport {
+                os: "windows".into(),
+                setting: PRI_ID.into(),
+                status: "ok".into(),
+                value: state.encode(),
+                detail: "GetPriorityClass/GetProcessAffinityMask".into(),
+                source_url: PRI_SRC.into(),
+                requires_elevation: false,
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: PRI_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: PRI_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn set_process_priority(reason: &str) -> SettingReport {
+        let mut pid = None;
+        let mut priority = HIGH_PRIORITY_CLASS;
+        let mut affinity: Option<u64> = None;
+        for part in reason.split(';') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            if let Some(v) = part.strip_prefix("pid=") {
+                pid = v.parse::<u32>().ok();
+            } else if let Some(v) = part.strip_prefix("priority=") {
+                if let Some(hex) = v.strip_prefix("0x").or_else(|| v.strip_prefix("0X")) {
+                    priority = u32::from_str_radix(hex, 16).unwrap_or(priority);
+                } else if let Ok(n) = v.parse::<u32>() {
+                    priority = n;
+                }
+            } else if let Some(v) = part.strip_prefix("affinity=") {
+                if let Some(hex) = v.strip_prefix("0x").or_else(|| v.strip_prefix("0X")) {
+                    affinity = u64::from_str_radix(hex, 16).ok();
+                } else {
+                    affinity = v.parse::<u64>().ok();
+                }
+            } else if pid.is_none() {
+                pid = part.parse::<u32>().ok();
+            }
+        }
+        let Some(pid) = pid else {
+            return SettingReport {
+                os: "windows".into(),
+                setting: PRI_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: format!("expected pid[;priority=..][;affinity=..], got {reason}"),
+                source_url: PRI_SRC.into(),
+                requires_elevation: false,
+            };
+        };
+        if let Err(err) = OsProcessPriorityBackend.set_priority(pid, priority) {
+            return SettingReport {
+                os: "windows".into(),
+                setting: PRI_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: PRI_SRC.into(),
+                requires_elevation: false,
+            };
+        }
+        if let Some(mask) = affinity {
+            if let Err(err) = OsProcessPriorityBackend.set_affinity(pid, mask) {
+                return SettingReport {
+                    os: "windows".into(),
+                    setting: PRI_ID.into(),
+                    status: "failed".into(),
+                    value: String::new(),
+                    detail: err.to_string(),
+                    source_url: PRI_SRC.into(),
+                    requires_elevation: false,
+                };
+            }
+        }
+        match OsProcessPriorityBackend.read(pid) {
+            Ok(state) => SettingReport {
+                os: "windows".into(),
+                setting: PRI_ID.into(),
+                status: "ok".into(),
+                value: state.encode(),
+                detail: format!("SetPriorityClass pid={pid} priority=0x{priority:x}"),
+                source_url: PRI_SRC.into(),
+                requires_elevation: false,
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: PRI_ID.into(),
+                status: "partial".into(),
+                value: String::new(),
+                detail: format!("set ok but verify read failed: {err}"),
+                source_url: PRI_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn close_background_app(reason: &str) -> SettingReport {
+        let pid = match parse_pid(reason) {
+            Ok(pid) => pid,
+            Err(detail) => {
+                return SettingReport {
+                    os: "windows".into(),
+                    setting: BG_ID.into(),
+                    status: "failed".into(),
+                    value: String::new(),
+                    detail,
+                    source_url: BG_SRC.into(),
+                    requires_elevation: false,
+                };
+            }
+        };
+        match OsBackgroundAppsBackend.close(pid) {
+            Ok(()) => SettingReport {
+                os: "windows".into(),
+                setting: BG_ID.into(),
+                status: "ok".into(),
+                value: format!("pid={pid};status=closed"),
+                detail: "TerminateProcess (user-chosen PID only)".into(),
+                source_url: BG_SRC.into(),
+                requires_elevation: false,
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: BG_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: BG_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn pause_background_app(reason: &str) -> SettingReport {
+        let pid = match parse_pid(reason) {
+            Ok(pid) => pid,
+            Err(detail) => {
+                return SettingReport {
+                    os: "windows".into(),
+                    setting: BG_ID.into(),
+                    status: "failed".into(),
+                    value: String::new(),
+                    detail,
+                    source_url: BG_SRC.into(),
+                    requires_elevation: false,
+                };
+            }
+        };
+        match OsBackgroundAppsBackend.pause(pid) {
+            Ok(()) => SettingReport {
+                os: "windows".into(),
+                setting: BG_ID.into(),
+                status: "ok".into(),
+                value: format!("pid={pid};status=paused"),
+                detail: "SuspendThread (user-chosen PID only)".into(),
+                source_url: BG_SRC.into(),
+                requires_elevation: false,
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: BG_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: BG_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn resume_background_app(reason: &str) -> SettingReport {
+        let pid = match parse_pid(reason) {
+            Ok(pid) => pid,
+            Err(detail) => {
+                return SettingReport {
+                    os: "windows".into(),
+                    setting: BG_ID.into(),
+                    status: "failed".into(),
+                    value: String::new(),
+                    detail,
+                    source_url: BG_SRC.into(),
+                    requires_elevation: false,
+                };
+            }
+        };
+        match OsBackgroundAppsBackend.resume(pid) {
+            Ok(()) => SettingReport {
+                os: "windows".into(),
+                setting: BG_ID.into(),
+                status: "ok".into(),
+                value: format!("pid={pid};status=running"),
+                detail: "ResumeThread (user-chosen PID only)".into(),
+                source_url: BG_SRC.into(),
+                requires_elevation: false,
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: BG_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: BG_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn list_startup_apps() -> SettingReport {
+        match OsStartupAppsBackend.list() {
+            Ok(entries) => {
+                let value = entries
+                    .iter()
+                    .map(StartupEntry::encode)
+                    .collect::<Vec<_>>()
+                    .join("|");
+                SettingReport {
+                    os: "windows".into(),
+                    setting: START_ID.into(),
+                    status: "ok".into(),
+                    value,
+                    detail: format!("{} HKCU Run entries", entries.len()),
+                    source_url: START_SRC.into(),
+                    requires_elevation: false,
+                }
+            }
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: START_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: START_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn set_startup_app(reason: &str) -> SettingReport {
+        let mut name = None;
+        let mut enabled = None;
+        for part in reason.split(';') {
+            let part = part.trim();
+            if let Some(v) = part.strip_prefix("name=") {
+                name = Some(v.to_string());
+            } else if let Some(v) = part.strip_prefix("enabled=") {
+                enabled = Some(matches!(v, "1" | "true" | "on"));
+            } else if name.is_none() && !part.is_empty() && !part.contains('=') {
+                name = Some(part.to_string());
+            }
+        }
+        let (Some(name), Some(enabled)) = (name, enabled) else {
+            return SettingReport {
+                os: "windows".into(),
+                setting: START_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: format!("expected name=...;enabled=0|1, got {reason}"),
+                source_url: START_SRC.into(),
+                requires_elevation: false,
+            };
+        };
+        match OsStartupAppsBackend.set_enabled(&name, enabled) {
+            Ok(()) => match OsStartupAppsBackend.get(&name) {
+                Ok(entry) => SettingReport {
+                    os: "windows".into(),
+                    setting: START_ID.into(),
+                    status: "ok".into(),
+                    value: entry.encode(),
+                    detail: format!("StartupApproved {} => enabled={enabled}", entry.name),
+                    source_url: START_SRC.into(),
+                    requires_elevation: false,
+                },
+                Err(err) => SettingReport {
+                    os: "windows".into(),
+                    setting: START_ID.into(),
+                    status: "partial".into(),
+                    value: String::new(),
+                    detail: format!("set ok but verify read failed: {err}"),
+                    source_url: START_SRC.into(),
+                    requires_elevation: false,
+                },
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: START_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: START_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
 }
 
 #[cfg(not(windows))]
@@ -320,19 +662,118 @@ pub fn set_hags(mode: Option<&str>) -> SettingReport {
     }
 }
 
-/// Register Windows action handlers for headless restore-all (HZ-020).
+pub fn get_process_priority(reason: Option<&str>) -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::get_process_priority(reason.unwrap_or(""))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = reason;
+        not_windows("windows.process_priority", false)
+    }
+}
+
+pub fn set_process_priority(reason: Option<&str>) -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::set_process_priority(reason.unwrap_or(""))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = reason;
+        not_windows("windows.process_priority", false)
+    }
+}
+
+pub fn close_background_app(reason: Option<&str>) -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::close_background_app(reason.unwrap_or(""))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = reason;
+        not_windows("windows.background_apps", false)
+    }
+}
+
+pub fn pause_background_app(reason: Option<&str>) -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::pause_background_app(reason.unwrap_or(""))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = reason;
+        not_windows("windows.background_apps", false)
+    }
+}
+
+pub fn resume_background_app(reason: Option<&str>) -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::resume_background_app(reason.unwrap_or(""))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = reason;
+        not_windows("windows.background_apps", false)
+    }
+}
+
+pub fn list_startup_apps() -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::list_startup_apps()
+    }
+    #[cfg(not(windows))]
+    {
+        not_windows("windows.startup_apps", false)
+    }
+}
+
+pub fn set_startup_app(reason: Option<&str>) -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::set_startup_app(reason.unwrap_or(""))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = reason;
+        not_windows("windows.startup_apps", false)
+    }
+}
+
+/// Register Windows action handlers for headless restore-all (HZ-020 / HZ-021).
 pub fn register_windows_actions(registry: &mut hertzline_core::restore::MapActionRegistry) {
     #[cfg(windows)]
     {
         use hertzline_core::actions::windows::{
-            game_mode::os::OsGameModeBackend, hags::os::OsHagsBackend,
-            power_plan::os::OsPowerPlanBackend, GameModeAction, HagsAction, PowerPlanAction,
+            background::os::OsBackgroundAppsBackend, game_mode::os::OsGameModeBackend,
+            hags::os::OsHagsBackend, power_plan::os::OsPowerPlanBackend,
+            priority::os::OsProcessPriorityBackend, startup::os::OsStartupAppsBackend,
+            BackgroundAppsAction, GameModeAction, HagsAction, PowerPlanAction,
+            ProcessPriorityAction, StartupAppsAction,
         };
         registry.insert(Box::new(PowerPlanAction::high_performance(
             OsPowerPlanBackend,
         )));
         registry.insert(Box::new(GameModeAction::enable(OsGameModeBackend)));
         registry.insert(Box::new(HagsAction::enable(OsHagsBackend)));
+        // Placeholder pid/name; restore adopts identity from snapshot (AC-4.3--4.5).
+        registry.insert(Box::new(ProcessPriorityAction::high_priority(
+            OsProcessPriorityBackend,
+            0,
+        )));
+        registry.insert(Box::new(BackgroundAppsAction::pause(
+            OsBackgroundAppsBackend,
+            0,
+        )));
+        registry.insert(Box::new(StartupAppsAction::disable(
+            OsStartupAppsBackend,
+            "",
+        )));
     }
     #[cfg(not(windows))]
     {
@@ -380,6 +821,27 @@ mod tests {
         #[cfg(not(windows))]
         {
             assert_eq!(report.status, "not_possible");
+        }
+    }
+
+    #[test]
+    fn hz021_ops_shape() {
+        let pri = get_process_priority(Some(""));
+        assert_eq!(pri.setting, "windows.process_priority");
+        let startup = list_startup_apps();
+        assert_eq!(startup.setting, "windows.startup_apps");
+        #[cfg(windows)]
+        {
+            assert!(pri.status == "failed" || pri.status == "ok");
+            assert!(startup.status == "ok" || startup.status == "failed");
+            let self_pri = get_process_priority(Some(&std::process::id().to_string()));
+            assert_eq!(self_pri.status, "ok");
+            assert!(self_pri.value.contains("pid="));
+        }
+        #[cfg(not(windows))]
+        {
+            assert_eq!(pri.status, "not_possible");
+            assert_eq!(startup.status, "not_possible");
         }
     }
 }

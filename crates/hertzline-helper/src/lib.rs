@@ -66,6 +66,34 @@ pub fn dispatch(request: &HelperRequest) -> HelperResponse {
             let report = windows_settings::set_hags(request.reason.as_deref());
             setting_response("set_hags", &report)
         }
+        HelperOp::GetProcessPriority => {
+            let report = windows_settings::get_process_priority(request.reason.as_deref());
+            setting_response("get_process_priority", &report)
+        }
+        HelperOp::SetProcessPriority => {
+            let report = windows_settings::set_process_priority(request.reason.as_deref());
+            setting_response("set_process_priority", &report)
+        }
+        HelperOp::CloseBackgroundApp => {
+            let report = windows_settings::close_background_app(request.reason.as_deref());
+            setting_response("close_background_app", &report)
+        }
+        HelperOp::PauseBackgroundApp => {
+            let report = windows_settings::pause_background_app(request.reason.as_deref());
+            setting_response("pause_background_app", &report)
+        }
+        HelperOp::ResumeBackgroundApp => {
+            let report = windows_settings::resume_background_app(request.reason.as_deref());
+            setting_response("resume_background_app", &report)
+        }
+        HelperOp::ListStartupApps => {
+            let report = windows_settings::list_startup_apps();
+            setting_response("list_startup_apps", &report)
+        }
+        HelperOp::SetStartupApp => {
+            let report = windows_settings::set_startup_app(request.reason.as_deref());
+            setting_response("set_startup_app", &report)
+        }
     }
 }
 
@@ -184,5 +212,30 @@ mod tests {
         });
         assert!(hags.payload.is_some());
         assert!(HelperOp::SetHags.requires_elevation());
+    }
+
+    #[test]
+    fn hz021_ops_on_allow_list() {
+        for token in [
+            "get_process_priority",
+            "set_process_priority",
+            "close_background_app",
+            "pause_background_app",
+            "resume_background_app",
+            "list_startup_apps",
+            "set_startup_app",
+        ] {
+            assert!(parse_op_token(token).is_ok(), "{token}");
+        }
+        let list = dispatch(&HelperRequest {
+            op: HelperOp::ListStartupApps,
+            reason: None,
+        });
+        assert!(list.payload.is_some());
+        let pri = dispatch(&HelperRequest {
+            op: HelperOp::GetProcessPriority,
+            reason: Some(std::process::id().to_string()),
+        });
+        assert!(pri.payload.is_some());
     }
 }

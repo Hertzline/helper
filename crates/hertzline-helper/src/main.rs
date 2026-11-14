@@ -19,11 +19,16 @@ fn print_usage() {
         "hertzline-helper {CRATE_VERSION}\n\
          usage: hertzline-helper <op> [--reason TEXT] [--store PATH] [--json]\n\
          ops: ping|probe_elevate_path|restore_all|create_restore_point|\n\
-              get_power_plan|set_power_plan|get_game_mode|set_game_mode|get_hags|set_hags\n\
+              get_power_plan|set_power_plan|get_game_mode|set_game_mode|get_hags|set_hags|\n\
+              get_process_priority|set_process_priority|close_background_app|\n\
+              pause_background_app|resume_background_app|list_startup_apps|set_startup_app\n\
          create_restore_point: --reason is the restore point description (Windows only)\n\
          set_power_plan: --reason is scheme GUID (default High performance)\n\
          set_game_mode: --reason 0|1 (default 1)\n\
          set_hags: --reason 1|2 (Off|On); requires elevation; reboot for effect\n\
+         get/set_process_priority: --reason pid[;priority=0x80][;affinity=0x..]\n\
+         close/pause/resume_background_app: --reason pid (user-chosen only)\n\
+         set_startup_app: --reason name=...;enabled=0|1\n\
          unknown ops are rejected (exit 2)"
     );
 }
