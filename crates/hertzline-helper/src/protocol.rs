@@ -14,6 +14,8 @@ pub enum HelperOp {
     ProbeElevatePath,
     /// Roll back every outstanding Hertzline change (AC-7.2 / AC-7.3).
     RestoreAll,
+    /// Create a Windows System Restore point before system-level changes (AC-7.4).
+    CreateRestorePoint,
 }
 
 impl HelperOp {
@@ -21,6 +23,7 @@ impl HelperOp {
         HelperOp::Ping,
         HelperOp::ProbeElevatePath,
         HelperOp::RestoreAll,
+        HelperOp::CreateRestorePoint,
     ];
 
     pub fn as_token(self) -> &'static str {
@@ -28,6 +31,7 @@ impl HelperOp {
             HelperOp::Ping => "ping",
             HelperOp::ProbeElevatePath => "probe_elevate_path",
             HelperOp::RestoreAll => "restore_all",
+            HelperOp::CreateRestorePoint => "create_restore_point",
         }
     }
 
@@ -36,6 +40,7 @@ impl HelperOp {
             "ping" => Some(HelperOp::Ping),
             "probe_elevate_path" => Some(HelperOp::ProbeElevatePath),
             "restore_all" => Some(HelperOp::RestoreAll),
+            "create_restore_point" => Some(HelperOp::CreateRestorePoint),
             _ => None,
         }
     }
@@ -46,11 +51,14 @@ impl HelperOp {
             HelperOp::Ping => "Hertzline helper connectivity check (no elevation)",
             HelperOp::ProbeElevatePath => "Hertzline helper elevation path probe (no elevation)",
             HelperOp::RestoreAll => "Hertzline restore all previous system changes",
+            HelperOp::CreateRestorePoint => {
+                "Hertzline create a Windows System Restore point before system changes"
+            }
         }
     }
 
     pub fn requires_elevation(self) -> bool {
-        matches!(self, HelperOp::RestoreAll)
+        matches!(self, HelperOp::RestoreAll | HelperOp::CreateRestorePoint)
     }
 }
 

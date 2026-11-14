@@ -5,6 +5,7 @@
 pub mod elevate;
 pub mod protocol;
 pub mod restore;
+pub mod system_restore;
 
 pub const CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -21,6 +22,14 @@ pub fn dispatch(request: &HelperRequest) -> HelperResponse {
         HelperOp::RestoreAll => {
             let report = restore::restore_all(request.reason.as_deref().unwrap_or("explicit"));
             HelperResponse::ok_json("restore_all", &report)
+        }
+        HelperOp::CreateRestorePoint => {
+            let report = system_restore::create_restore_point(request.reason.as_deref());
+            let mut response = HelperResponse::ok_json("create_restore_point", &report);
+            if report.status == "failed" || report.status == "unavailable" {
+                response.accepted = false;
+            }
+            response
         }
     }
 }
@@ -81,5 +90,23 @@ mod tests {
         assert_eq!(report.trigger, "crash");
         assert!(!report.requires_ui);
         assert!(report.status == "ok" || report.status == "partial" || report.status == "error");
+    }
+
+    #[test]
+    fn create_restore_point_is_on_allow_list() {
+        assert_eq!(
+            parse_op_token("create_restore_point").unwrap(),
+            HelperOp::CreateRestorePoint
+        );
+        assert!(HelperOp::CreateRestorePoint.requires_elevation());
+        let report = system_restore::create_restore_point(Some("Hertzline test restore point"));
+        assert!(!report.description.is_empty());
+        assert!(!report.source_url.is_empty());
+        let res = dispatch(&HelperRequest {
+            op: HelperOp::CreateRestorePoint,
+            reason: Some("Hertzline test restore point".into()),
+        });
+        assert!(res.payload.is_some());
+        assert_eq!(res.detail, "create_restore_point");
     }
 }

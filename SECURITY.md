@@ -9,3 +9,7 @@ Do not open public issues for undisclosed vulnerabilities.
 
 This repository owns the privileged broker. It must accept only a fixed
 allow-list of named operations. No arbitrary shell, no generic "run command".
+
+Allow-list (HZ-019): `ping`, `probe_elevate_path`, `restore_all`,
+`create_restore_point` (Windows System Restore via SrClient.dll
+`SRSetRestorePointW`; not possible on Linux/macOS).

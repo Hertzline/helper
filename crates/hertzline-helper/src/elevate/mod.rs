@@ -86,4 +86,11 @@ mod tests {
         assert!(spec.requires_elevation);
         assert!(!spec.plan.mechanism.is_empty());
     }
+
+    #[test]
+    fn create_restore_point_marks_elevation() {
+        let spec = resolve_launch(HelperOp::CreateRestorePoint);
+        assert!(spec.requires_elevation);
+        assert!(spec.elevation_reason.contains("System Restore"));
+    }
 }

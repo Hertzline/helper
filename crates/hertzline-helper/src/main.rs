@@ -17,7 +17,8 @@ use std::process::ExitCode;
 fn print_usage() {
     eprintln!(
         "hertzline-helper {CRATE_VERSION}\n\
-         usage: hertzline-helper <ping|probe_elevate_path|restore_all> [--reason TEXT] [--store PATH] [--json]\n\
+         usage: hertzline-helper <ping|probe_elevate_path|restore_all|create_restore_point> [--reason TEXT] [--store PATH] [--json]\n\
+         create_restore_point: --reason is the restore point description (Windows only)\n\
          unknown ops are rejected (exit 2)"
     );
 }
@@ -87,6 +88,7 @@ fn main() -> ExitCode {
 
     // restore_all: partial (missing handlers) stays accepted so uninstall can
     // continue after logging; hard load errors reject (exit 1).
+    // create_restore_point: reason is the restore-point description.
     let res = if op == HelperOp::RestoreAll {
         let trigger = reason.as_deref().unwrap_or("explicit");
         let report = restore::restore_all(trigger);
