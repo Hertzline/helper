@@ -3,6 +3,7 @@
 //! No arbitrary shell. Elevation is requested per named operation.
 
 pub mod elevate;
+pub mod linux_settings;
 pub mod protocol;
 pub mod restore;
 pub mod system_restore;
@@ -11,6 +12,7 @@ pub mod windows_settings;
 pub const CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use protocol::{HelperError, HelperOp, HelperRequest, HelperResponse};
+use serde::Serialize;
 
 /// Dispatch a named request. Unknown ops never reach OS elevation.
 pub fn dispatch(request: &HelperRequest) -> HelperResponse {
@@ -135,14 +137,46 @@ pub fn dispatch(request: &HelperRequest) -> HelperResponse {
             let report = windows_settings::set_display_refresh(request.reason.as_deref());
             setting_response("set_display_refresh", &report)
         }
+        HelperOp::GetFeralGameMode => {
+            let report = linux_settings::get_feral_gamemode(request.reason.as_deref());
+            linux_setting_response("get_feral_gamemode", &report)
+        }
+        HelperOp::SetFeralGameMode => {
+            let report = linux_settings::set_feral_gamemode(request.reason.as_deref());
+            linux_setting_response("set_feral_gamemode", &report)
+        }
+        HelperOp::GetEnergyProfile => {
+            let report = linux_settings::get_energy_profile();
+            linux_setting_response("get_energy_profile", &report)
+        }
+        HelperOp::SetEnergyProfile => {
+            let report = linux_settings::set_energy_profile(request.reason.as_deref());
+            linux_setting_response("set_energy_profile", &report)
+        }
+        HelperOp::GetNiceIonice => {
+            let report = linux_settings::get_nice_ionice(request.reason.as_deref());
+            linux_setting_response("get_nice_ionice", &report)
+        }
+        HelperOp::SetNiceIonice => {
+            let report = linux_settings::set_nice_ionice(request.reason.as_deref());
+            linux_setting_response("set_nice_ionice", &report)
+        }
     }
 }
 
 fn setting_response(detail: &str, report: &windows_settings::SettingReport) -> HelperResponse {
+    finish_setting_response(detail, &report.status, report)
+}
+
+fn linux_setting_response(detail: &str, report: &linux_settings::SettingReport) -> HelperResponse {
+    finish_setting_response(detail, &report.status, report)
+}
+
+fn finish_setting_response(detail: &str, status: &str, report: &impl Serialize) -> HelperResponse {
     let mut response = HelperResponse::ok_json(detail, report);
-    if report.status == "failed" || report.status == "unavailable" {
+    if status == "failed" || status == "unavailable" {
         response.accepted = false;
-    } else if report.status == "not_possible" {
+    } else if status == "not_possible" {
         // Get probes of unsupported settings still succeed; set/apply paths reject.
         response.accepted = detail.starts_with("get_");
     }
@@ -319,5 +353,35 @@ mod tests {
             reason: None,
         });
         assert!(display.payload.is_some());
+    }
+
+    #[test]
+    fn hz023_ops_on_allow_list() {
+        for token in [
+            "get_feral_gamemode",
+            "set_feral_gamemode",
+            "get_energy_profile",
+            "set_energy_profile",
+            "get_nice_ionice",
+            "set_nice_ionice",
+        ] {
+            assert!(parse_op_token(token).is_ok(), "{token}");
+        }
+        assert!(HelperOp::SetNiceIonice.requires_elevation());
+        let gm = dispatch(&HelperRequest {
+            op: HelperOp::GetFeralGameMode,
+            reason: Some(std::process::id().to_string()),
+        });
+        assert!(gm.payload.is_some());
+        let energy = dispatch(&HelperRequest {
+            op: HelperOp::GetEnergyProfile,
+            reason: None,
+        });
+        assert!(energy.payload.is_some());
+        let nice = dispatch(&HelperRequest {
+            op: HelperOp::GetNiceIonice,
+            reason: Some(std::process::id().to_string()),
+        });
+        assert!(nice.payload.is_some());
     }
 }

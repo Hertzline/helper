@@ -103,4 +103,14 @@ mod tests {
         assert!(!resolve_launch(HelperOp::SetPowerPlan).requires_elevation);
         assert!(!resolve_launch(HelperOp::SetGameMode).requires_elevation);
     }
+
+    #[test]
+    fn set_nice_ionice_marks_elevation() {
+        let spec = resolve_launch(HelperOp::SetNiceIonice);
+        assert!(spec.requires_elevation);
+        assert!(spec.elevation_reason.contains("nice") || spec.elevation_reason.contains("ionice"));
+        assert!(!resolve_launch(HelperOp::GetNiceIonice).requires_elevation);
+        assert!(!resolve_launch(HelperOp::SetFeralGameMode).requires_elevation);
+        assert!(!resolve_launch(HelperOp::SetEnergyProfile).requires_elevation);
+    }
 }

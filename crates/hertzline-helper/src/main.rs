@@ -23,7 +23,9 @@ fn print_usage() {
               get_process_priority|set_process_priority|close_background_app|\n\
               pause_background_app|resume_background_app|list_startup_apps|set_startup_app|\n\
               get_game_bar|set_game_bar|preview_cleanup|apply_cleanup|\n\
-              get_storage_health|get_driver_info|get_display|set_display_refresh\n\
+              get_storage_health|get_driver_info|get_display|set_display_refresh|\n\
+              get_feral_gamemode|set_feral_gamemode|get_energy_profile|set_energy_profile|\n\
+              get_nice_ionice|set_nice_ionice\n\
          create_restore_point: --reason is the restore point description (Windows only)\n\
          set_power_plan: --reason is scheme GUID (default High performance)\n\
          set_game_mode: --reason 0|1 (default 1)\n\
@@ -34,6 +36,9 @@ fn print_usage() {
          set_game_bar: --reason 0|1 (default 0 = disable capture)\n\
          apply_cleanup: --reason confirm=1 required after preview_cleanup\n\
          set_display_refresh: --reason Hz (e.g. 60)\n\
+         get/set_feral_gamemode: --reason pid[;op=register|unregister] (Linux)\n\
+         set_energy_profile: --reason profile (ppd performance|balanced|power-saver, or tuned name)\n\
+         get/set_nice_ionice: --reason pid[;nice=N;ioprio_class=C;ioprio_level=L]; set needs elevation\n\
          unknown ops are rejected (exit 2)"
     );
 }

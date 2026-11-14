@@ -2,10 +2,11 @@
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD polkit Policy Configuration 1.0//EN"
  "http://www.freedesktop.org/software/polkit/policyconfig-1.dtd">
 <!--
-  Draft polkit policy for Hertzline helper (D2 / HZ-005).
+  Draft polkit policy for Hertzline helper (D2 / HZ-005 / HZ-023).
   Install path (packaging): /usr/share/polkit-1/actions/org.hertzline.helper.policy
   Sources: https://www.freedesktop.org/software/polkit/docs/latest/polkit.8.html
            https://www.freedesktop.org/software/polkit/docs/latest/pkexec.1.html
+           https://man7.org/linux/man-pages/man2/setpriority.2.html
 
   Replace HELPER_INSTALL_PATH at package time with the real absolute path.
   Defaults require admin auth; never yes for allow_any.
@@ -24,5 +25,17 @@
     </defaults>
     <annotate key="org.freedesktop.policykit.exec.path">HELPER_INSTALL_PATH</annotate>
     <annotate key="org.freedesktop.policykit.exec.argv1">restore_all</annotate>
+  </action>
+
+  <action id="org.hertzline.helper.set-nice-ionice">
+    <description>Set nice and ionice for a user-chosen process</description>
+    <message>Authentication is required to change process nice/ionice (CAP_SYS_NICE)</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">HELPER_INSTALL_PATH</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">set_nice_ionice</annotate>
   </action>
 </policyconfig>

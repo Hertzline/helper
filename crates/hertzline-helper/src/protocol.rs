@@ -58,6 +58,18 @@ pub enum HelperOp {
     GetDisplay,
     /// Set display refresh Hz (AC-4.10). Arg = Hz. No elevation.
     SetDisplayRefresh,
+    /// Probe/query Feral GameMode status for a PID (AC-4.11). Arg = pid. No elevation.
+    GetFeralGameMode,
+    /// Register or unregister a PID with Feral GameMode (AC-4.11). Arg = pid;op=register|unregister.
+    SetFeralGameMode,
+    /// Read energy profile via ppd or tuned (AC-4.12). No elevation.
+    GetEnergyProfile,
+    /// Set energy profile (AC-4.12). Arg = profile name (ppd) or tuned profile. No elevation for ppd.
+    SetEnergyProfile,
+    /// Read nice + ionice for a PID (AC-4.13). Arg = pid. No elevation.
+    GetNiceIonice,
+    /// Set nice + ionice for a PID (AC-4.13). Arg = pid;nice=N;ioprio_class=C;ioprio_level=L. Elevation when nice < 0.
+    SetNiceIonice,
 }
 
 impl HelperOp {
@@ -87,6 +99,12 @@ impl HelperOp {
         HelperOp::GetDriverInfo,
         HelperOp::GetDisplay,
         HelperOp::SetDisplayRefresh,
+        HelperOp::GetFeralGameMode,
+        HelperOp::SetFeralGameMode,
+        HelperOp::GetEnergyProfile,
+        HelperOp::SetEnergyProfile,
+        HelperOp::GetNiceIonice,
+        HelperOp::SetNiceIonice,
     ];
 
     pub fn as_token(self) -> &'static str {
@@ -116,6 +134,12 @@ impl HelperOp {
             HelperOp::GetDriverInfo => "get_driver_info",
             HelperOp::GetDisplay => "get_display",
             HelperOp::SetDisplayRefresh => "set_display_refresh",
+            HelperOp::GetFeralGameMode => "get_feral_gamemode",
+            HelperOp::SetFeralGameMode => "set_feral_gamemode",
+            HelperOp::GetEnergyProfile => "get_energy_profile",
+            HelperOp::SetEnergyProfile => "set_energy_profile",
+            HelperOp::GetNiceIonice => "get_nice_ionice",
+            HelperOp::SetNiceIonice => "set_nice_ionice",
         }
     }
 
@@ -146,6 +170,12 @@ impl HelperOp {
             "get_driver_info" => Some(HelperOp::GetDriverInfo),
             "get_display" => Some(HelperOp::GetDisplay),
             "set_display_refresh" => Some(HelperOp::SetDisplayRefresh),
+            "get_feral_gamemode" => Some(HelperOp::GetFeralGameMode),
+            "set_feral_gamemode" => Some(HelperOp::SetFeralGameMode),
+            "get_energy_profile" => Some(HelperOp::GetEnergyProfile),
+            "set_energy_profile" => Some(HelperOp::SetEnergyProfile),
+            "get_nice_ionice" => Some(HelperOp::GetNiceIonice),
+            "set_nice_ionice" => Some(HelperOp::SetNiceIonice),
             _ => None,
         }
     }
@@ -202,13 +232,34 @@ impl HelperOp {
                 "Hertzline report display refresh rate and VRR availability (no elevation)"
             }
             HelperOp::SetDisplayRefresh => "Hertzline set display refresh rate (no elevation)",
+            HelperOp::GetFeralGameMode => {
+                "Hertzline query Feral GameMode status for a PID (no elevation)"
+            }
+            HelperOp::SetFeralGameMode => {
+                "Hertzline register/unregister a PID with Feral GameMode (no elevation)"
+            }
+            HelperOp::GetEnergyProfile => {
+                "Hertzline read Linux energy profile via ppd or tuned (no elevation)"
+            }
+            HelperOp::SetEnergyProfile => {
+                "Hertzline set Linux energy profile via ppd or tuned (no elevation)"
+            }
+            HelperOp::GetNiceIonice => {
+                "Hertzline read nice/ionice for a user-chosen PID (no elevation)"
+            }
+            HelperOp::SetNiceIonice => {
+                "Hertzline set nice/ionice for a user-chosen PID (may need CAP_SYS_NICE)"
+            }
         }
     }
 
     pub fn requires_elevation(self) -> bool {
         matches!(
             self,
-            HelperOp::RestoreAll | HelperOp::CreateRestorePoint | HelperOp::SetHags
+            HelperOp::RestoreAll
+                | HelperOp::CreateRestorePoint
+                | HelperOp::SetHags
+                | HelperOp::SetNiceIonice
         )
     }
 }
@@ -314,5 +365,15 @@ mod tests {
         assert!(!HelperOp::GetDriverInfo.requires_elevation());
         assert!(!HelperOp::GetDisplay.requires_elevation());
         assert!(!HelperOp::SetDisplayRefresh.requires_elevation());
+    }
+
+    #[test]
+    fn hz023_ops_elevation_flags() {
+        assert!(!HelperOp::GetFeralGameMode.requires_elevation());
+        assert!(!HelperOp::SetFeralGameMode.requires_elevation());
+        assert!(!HelperOp::GetEnergyProfile.requires_elevation());
+        assert!(!HelperOp::SetEnergyProfile.requires_elevation());
+        assert!(!HelperOp::GetNiceIonice.requires_elevation());
+        assert!(HelperOp::SetNiceIonice.requires_elevation());
     }
 }
