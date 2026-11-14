@@ -42,6 +42,22 @@ pub enum HelperOp {
     ListStartupApps,
     /// Enable/disable a user-chosen startup entry (AC-4.5). Arg = name;enabled=0|1.
     SetStartupApp,
+    /// Read Xbox Game Bar capture toggle (AC-4.6). No elevation.
+    GetGameBar,
+    /// Set Xbox Game Bar capture toggle (AC-4.6). Arg = "0"|"1". No elevation.
+    SetGameBar,
+    /// Preview temp/shader cleanup sizes (AC-4.7). No elevation.
+    PreviewCleanup,
+    /// Apply opt-in cleanup after preview (AC-4.7). Arg must be "confirm=1". No elevation.
+    ApplyCleanup,
+    /// Storage free-space report (AC-4.8). No elevation. No destructive changes.
+    GetStorageHealth,
+    /// GPU driver versions + official vendor links (AC-4.9). No elevation.
+    GetDriverInfo,
+    /// Active display refresh + VRR honesty (AC-4.10). No elevation.
+    GetDisplay,
+    /// Set display refresh Hz (AC-4.10). Arg = Hz. No elevation.
+    SetDisplayRefresh,
 }
 
 impl HelperOp {
@@ -63,6 +79,14 @@ impl HelperOp {
         HelperOp::ResumeBackgroundApp,
         HelperOp::ListStartupApps,
         HelperOp::SetStartupApp,
+        HelperOp::GetGameBar,
+        HelperOp::SetGameBar,
+        HelperOp::PreviewCleanup,
+        HelperOp::ApplyCleanup,
+        HelperOp::GetStorageHealth,
+        HelperOp::GetDriverInfo,
+        HelperOp::GetDisplay,
+        HelperOp::SetDisplayRefresh,
     ];
 
     pub fn as_token(self) -> &'static str {
@@ -84,6 +108,14 @@ impl HelperOp {
             HelperOp::ResumeBackgroundApp => "resume_background_app",
             HelperOp::ListStartupApps => "list_startup_apps",
             HelperOp::SetStartupApp => "set_startup_app",
+            HelperOp::GetGameBar => "get_game_bar",
+            HelperOp::SetGameBar => "set_game_bar",
+            HelperOp::PreviewCleanup => "preview_cleanup",
+            HelperOp::ApplyCleanup => "apply_cleanup",
+            HelperOp::GetStorageHealth => "get_storage_health",
+            HelperOp::GetDriverInfo => "get_driver_info",
+            HelperOp::GetDisplay => "get_display",
+            HelperOp::SetDisplayRefresh => "set_display_refresh",
         }
     }
 
@@ -106,6 +138,14 @@ impl HelperOp {
             "resume_background_app" => Some(HelperOp::ResumeBackgroundApp),
             "list_startup_apps" => Some(HelperOp::ListStartupApps),
             "set_startup_app" => Some(HelperOp::SetStartupApp),
+            "get_game_bar" => Some(HelperOp::GetGameBar),
+            "set_game_bar" => Some(HelperOp::SetGameBar),
+            "preview_cleanup" => Some(HelperOp::PreviewCleanup),
+            "apply_cleanup" => Some(HelperOp::ApplyCleanup),
+            "get_storage_health" => Some(HelperOp::GetStorageHealth),
+            "get_driver_info" => Some(HelperOp::GetDriverInfo),
+            "get_display" => Some(HelperOp::GetDisplay),
+            "set_display_refresh" => Some(HelperOp::SetDisplayRefresh),
             _ => None,
         }
     }
@@ -144,6 +184,24 @@ impl HelperOp {
             HelperOp::SetStartupApp => {
                 "Hertzline enable/disable a user-chosen startup app (no elevation)"
             }
+            HelperOp::GetGameBar => "Hertzline read Xbox Game Bar capture toggle (no elevation)",
+            HelperOp::SetGameBar => "Hertzline set Xbox Game Bar capture toggle (no elevation)",
+            HelperOp::PreviewCleanup => {
+                "Hertzline preview temp/shader cleanup sizes (no elevation)"
+            }
+            HelperOp::ApplyCleanup => {
+                "Hertzline apply opt-in temp/shader cleanup after preview (no elevation)"
+            }
+            HelperOp::GetStorageHealth => {
+                "Hertzline report volume free space warnings (no elevation)"
+            }
+            HelperOp::GetDriverInfo => {
+                "Hertzline report GPU driver versions and official vendor links (no elevation)"
+            }
+            HelperOp::GetDisplay => {
+                "Hertzline report display refresh rate and VRR availability (no elevation)"
+            }
+            HelperOp::SetDisplayRefresh => "Hertzline set display refresh rate (no elevation)",
         }
     }
 
@@ -244,5 +302,17 @@ mod tests {
         assert!(!HelperOp::ResumeBackgroundApp.requires_elevation());
         assert!(!HelperOp::ListStartupApps.requires_elevation());
         assert!(!HelperOp::SetStartupApp.requires_elevation());
+    }
+
+    #[test]
+    fn hz022_ops_no_elevation() {
+        assert!(!HelperOp::GetGameBar.requires_elevation());
+        assert!(!HelperOp::SetGameBar.requires_elevation());
+        assert!(!HelperOp::PreviewCleanup.requires_elevation());
+        assert!(!HelperOp::ApplyCleanup.requires_elevation());
+        assert!(!HelperOp::GetStorageHealth.requires_elevation());
+        assert!(!HelperOp::GetDriverInfo.requires_elevation());
+        assert!(!HelperOp::GetDisplay.requires_elevation());
+        assert!(!HelperOp::SetDisplayRefresh.requires_elevation());
     }
 }

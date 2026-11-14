@@ -21,7 +21,9 @@ fn print_usage() {
          ops: ping|probe_elevate_path|restore_all|create_restore_point|\n\
               get_power_plan|set_power_plan|get_game_mode|set_game_mode|get_hags|set_hags|\n\
               get_process_priority|set_process_priority|close_background_app|\n\
-              pause_background_app|resume_background_app|list_startup_apps|set_startup_app\n\
+              pause_background_app|resume_background_app|list_startup_apps|set_startup_app|\n\
+              get_game_bar|set_game_bar|preview_cleanup|apply_cleanup|\n\
+              get_storage_health|get_driver_info|get_display|set_display_refresh\n\
          create_restore_point: --reason is the restore point description (Windows only)\n\
          set_power_plan: --reason is scheme GUID (default High performance)\n\
          set_game_mode: --reason 0|1 (default 1)\n\
@@ -29,6 +31,9 @@ fn print_usage() {
          get/set_process_priority: --reason pid[;priority=0x80][;affinity=0x..]\n\
          close/pause/resume_background_app: --reason pid (user-chosen only)\n\
          set_startup_app: --reason name=...;enabled=0|1\n\
+         set_game_bar: --reason 0|1 (default 0 = disable capture)\n\
+         apply_cleanup: --reason confirm=1 required after preview_cleanup\n\
+         set_display_refresh: --reason Hz (e.g. 60)\n\
          unknown ops are rejected (exit 2)"
     );
 }

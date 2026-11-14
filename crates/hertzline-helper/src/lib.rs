@@ -94,6 +94,47 @@ pub fn dispatch(request: &HelperRequest) -> HelperResponse {
             let report = windows_settings::set_startup_app(request.reason.as_deref());
             setting_response("set_startup_app", &report)
         }
+        HelperOp::GetGameBar => {
+            let report = windows_settings::get_game_bar();
+            setting_response("get_game_bar", &report)
+        }
+        HelperOp::SetGameBar => {
+            let enabled = match request.reason.as_deref().map(str::trim) {
+                None | Some("0") | Some("off") | Some("false") => false,
+                Some("1") | Some("on") | Some("true") => true,
+                Some(other) => {
+                    return HelperResponse::rejected(format!(
+                        "set_game_bar reason must be 0 or 1, got {other}"
+                    ));
+                }
+            };
+            let report = windows_settings::set_game_bar(enabled);
+            setting_response("set_game_bar", &report)
+        }
+        HelperOp::PreviewCleanup => {
+            let report = windows_settings::preview_cleanup();
+            setting_response("preview_cleanup", &report)
+        }
+        HelperOp::ApplyCleanup => {
+            let report = windows_settings::apply_cleanup(request.reason.as_deref());
+            setting_response("apply_cleanup", &report)
+        }
+        HelperOp::GetStorageHealth => {
+            let report = windows_settings::get_storage_health();
+            setting_response("get_storage_health", &report)
+        }
+        HelperOp::GetDriverInfo => {
+            let report = windows_settings::get_driver_info();
+            setting_response("get_driver_info", &report)
+        }
+        HelperOp::GetDisplay => {
+            let report = windows_settings::get_display();
+            setting_response("get_display", &report)
+        }
+        HelperOp::SetDisplayRefresh => {
+            let report = windows_settings::set_display_refresh(request.reason.as_deref());
+            setting_response("set_display_refresh", &report)
+        }
     }
 }
 
@@ -237,5 +278,46 @@ mod tests {
             reason: Some(std::process::id().to_string()),
         });
         assert!(pri.payload.is_some());
+    }
+
+    #[test]
+    fn hz022_ops_on_allow_list() {
+        for token in [
+            "get_game_bar",
+            "set_game_bar",
+            "preview_cleanup",
+            "apply_cleanup",
+            "get_storage_health",
+            "get_driver_info",
+            "get_display",
+            "set_display_refresh",
+        ] {
+            assert!(parse_op_token(token).is_ok(), "{token}");
+        }
+        let bar = dispatch(&HelperRequest {
+            op: HelperOp::GetGameBar,
+            reason: None,
+        });
+        assert!(bar.payload.is_some());
+        let preview = dispatch(&HelperRequest {
+            op: HelperOp::PreviewCleanup,
+            reason: None,
+        });
+        assert!(preview.payload.is_some());
+        let storage = dispatch(&HelperRequest {
+            op: HelperOp::GetStorageHealth,
+            reason: None,
+        });
+        assert!(storage.payload.is_some());
+        let drivers = dispatch(&HelperRequest {
+            op: HelperOp::GetDriverInfo,
+            reason: None,
+        });
+        assert!(drivers.payload.is_some());
+        let display = dispatch(&HelperRequest {
+            op: HelperOp::GetDisplay,
+            reason: None,
+        });
+        assert!(display.payload.is_some());
     }
 }

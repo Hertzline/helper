@@ -1,8 +1,8 @@
-//! Windows settings helper ops (HZ-020 / HZ-021).
+//! Windows settings helper ops (HZ-020 / HZ-021 / HZ-022).
 //!
-//! Power plan, Game Mode, priority, background apps, and startup are
-//! unprivileged (current user / same-session process). HAGS write needs
-//! elevation (HKLM HwSchMode).
+//! Power plan, Game Mode, priority, background apps, startup, Game Bar,
+//! cleanup, storage, drivers, and display are unprivileged (current user /
+//! same-session). HAGS write needs elevation (HKLM HwSchMode).
 
 use serde::{Deserialize, Serialize};
 
@@ -578,6 +578,273 @@ mod win {
             },
         }
     }
+
+    use hertzline_core::action::Action;
+    use hertzline_core::actions::windows::cleanup::{
+        CleanupBackend, ACTION_ID as CLEAN_ID, SOURCE_URL as CLEAN_SRC,
+    };
+    use hertzline_core::actions::windows::display::{
+        DisplayBackend, ACTION_ID as DISP_ID, SOURCE_URL as DISP_SRC,
+    };
+    use hertzline_core::actions::windows::drivers::{ACTION_ID as DRV_ID, SOURCE_URL as DRV_SRC};
+    use hertzline_core::actions::windows::game_bar::{
+        GameBarBackend, ACTION_ID as BAR_ID, SOURCE_URL as BAR_SRC,
+    };
+    use hertzline_core::actions::windows::storage::{ACTION_ID as STOR_ID, SOURCE_URL as STOR_SRC};
+    use hertzline_core::actions::windows::{
+        cleanup::os::OsCleanupBackend, display::os::OsDisplayBackend,
+        drivers::os::OsDriversBackend, game_bar::os::OsGameBarBackend,
+        storage::os::OsStorageBackend, CleanupAction, DriverCheckAction, StorageHealthAction,
+    };
+
+    pub fn get_game_bar() -> SettingReport {
+        match OsGameBarBackend.get() {
+            Ok(value) => SettingReport {
+                os: "windows".into(),
+                setting: BAR_ID.into(),
+                status: "ok".into(),
+                value,
+                detail: "VKMToggleRecording".into(),
+                source_url: BAR_SRC.into(),
+                requires_elevation: false,
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: BAR_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: BAR_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn set_game_bar(enabled: bool) -> SettingReport {
+        match OsGameBarBackend.set(enabled) {
+            Ok(()) => match OsGameBarBackend.get() {
+                Ok(value) => SettingReport {
+                    os: "windows".into(),
+                    setting: BAR_ID.into(),
+                    status: "ok".into(),
+                    value,
+                    detail: format!("VKMToggleRecording={}", if enabled { 1 } else { 0 }),
+                    source_url: BAR_SRC.into(),
+                    requires_elevation: false,
+                },
+                Err(err) => SettingReport {
+                    os: "windows".into(),
+                    setting: BAR_ID.into(),
+                    status: "partial".into(),
+                    value: String::new(),
+                    detail: format!("set ok but verify read failed: {err}"),
+                    source_url: BAR_SRC.into(),
+                    requires_elevation: false,
+                },
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: BAR_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: BAR_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn preview_cleanup() -> SettingReport {
+        match OsCleanupBackend.preview() {
+            Ok(preview) => SettingReport {
+                os: "windows".into(),
+                setting: CLEAN_ID.into(),
+                status: "ok".into(),
+                value: preview.encode(),
+                detail: format!(
+                    "preview entries={} total_bytes={}",
+                    preview.entries.len(),
+                    preview.total_bytes
+                ),
+                source_url: CLEAN_SRC.into(),
+                requires_elevation: false,
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: CLEAN_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: CLEAN_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn apply_cleanup(reason: &str) -> SettingReport {
+        let confirmed = reason.trim() == "confirm=1"
+            || reason.trim() == "confirm=true"
+            || reason.trim().eq_ignore_ascii_case("confirm");
+        if !confirmed {
+            return SettingReport {
+                os: "windows".into(),
+                setting: CLEAN_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: "apply_cleanup requires --reason confirm=1 after preview (AC-4.7)".into(),
+                source_url: CLEAN_SRC.into(),
+                requires_elevation: false,
+            };
+        }
+        let mut action = CleanupAction::confirmed(OsCleanupBackend);
+        match action.apply() {
+            Ok(()) => match OsCleanupBackend.preview() {
+                Ok(preview) => SettingReport {
+                    os: "windows".into(),
+                    setting: CLEAN_ID.into(),
+                    status: "ok".into(),
+                    value: preview.encode(),
+                    detail: "cleanup applied (irreversible)".into(),
+                    source_url: CLEAN_SRC.into(),
+                    requires_elevation: false,
+                },
+                Err(err) => SettingReport {
+                    os: "windows".into(),
+                    setting: CLEAN_ID.into(),
+                    status: "partial".into(),
+                    value: String::new(),
+                    detail: format!("apply ok but preview failed: {err}"),
+                    source_url: CLEAN_SRC.into(),
+                    requires_elevation: false,
+                },
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: CLEAN_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: CLEAN_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn get_storage_health() -> SettingReport {
+        let action = StorageHealthAction::new(OsStorageBackend);
+        match action.read_state() {
+            Ok(value) => SettingReport {
+                os: "windows".into(),
+                setting: STOR_ID.into(),
+                status: "ok".into(),
+                value,
+                detail: "GetDiskFreeSpaceExW; SMART unavailable".into(),
+                source_url: STOR_SRC.into(),
+                requires_elevation: false,
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: STOR_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: STOR_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn get_driver_info() -> SettingReport {
+        let action = DriverCheckAction::new(OsDriversBackend);
+        match action.read_state() {
+            Ok(value) => SettingReport {
+                os: "windows".into(),
+                setting: DRV_ID.into(),
+                status: "ok".into(),
+                value,
+                detail: "display class DriverVersion + official vendor URLs only".into(),
+                source_url: DRV_SRC.into(),
+                requires_elevation: false,
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: DRV_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: DRV_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn get_display() -> SettingReport {
+        match OsDisplayBackend.get() {
+            Ok(state) => SettingReport {
+                os: "windows".into(),
+                setting: DISP_ID.into(),
+                status: "ok".into(),
+                value: state.encode(),
+                detail: "EnumDisplaySettingsW; VRR unavailable via public Win32".into(),
+                source_url: DISP_SRC.into(),
+                requires_elevation: false,
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: DISP_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: DISP_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
+
+    pub fn set_display_refresh(hz: &str) -> SettingReport {
+        let Ok(hz) = hz.trim().parse::<u32>() else {
+            return SettingReport {
+                os: "windows".into(),
+                setting: DISP_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: format!("set_display_refresh reason must be Hz integer, got {hz}"),
+                source_url: DISP_SRC.into(),
+                requires_elevation: false,
+            };
+        };
+        match OsDisplayBackend.set_refresh_hz(hz) {
+            Ok(()) => match OsDisplayBackend.get() {
+                Ok(state) => SettingReport {
+                    os: "windows".into(),
+                    setting: DISP_ID.into(),
+                    status: "ok".into(),
+                    value: state.encode(),
+                    detail: format!("ChangeDisplaySettingsExW refresh={hz}"),
+                    source_url: DISP_SRC.into(),
+                    requires_elevation: false,
+                },
+                Err(err) => SettingReport {
+                    os: "windows".into(),
+                    setting: DISP_ID.into(),
+                    status: "partial".into(),
+                    value: String::new(),
+                    detail: format!("set ok but verify read failed: {err}"),
+                    source_url: DISP_SRC.into(),
+                    requires_elevation: false,
+                },
+            },
+            Err(err) => SettingReport {
+                os: "windows".into(),
+                setting: DISP_ID.into(),
+                status: "failed".into(),
+                value: String::new(),
+                detail: err.to_string(),
+                source_url: DISP_SRC.into(),
+                requires_elevation: false,
+            },
+        }
+    }
 }
 
 #[cfg(not(windows))]
@@ -745,16 +1012,110 @@ pub fn set_startup_app(reason: Option<&str>) -> SettingReport {
     }
 }
 
-/// Register Windows action handlers for headless restore-all (HZ-020 / HZ-021).
+pub fn get_game_bar() -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::get_game_bar()
+    }
+    #[cfg(not(windows))]
+    {
+        not_windows("windows.game_bar_capture", false)
+    }
+}
+
+pub fn set_game_bar(enabled: bool) -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::set_game_bar(enabled)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = enabled;
+        not_windows("windows.game_bar_capture", false)
+    }
+}
+
+pub fn preview_cleanup() -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::preview_cleanup()
+    }
+    #[cfg(not(windows))]
+    {
+        not_windows("windows.temp_shader_cleanup", false)
+    }
+}
+
+pub fn apply_cleanup(reason: Option<&str>) -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::apply_cleanup(reason.unwrap_or(""))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = reason;
+        not_windows("windows.temp_shader_cleanup", false)
+    }
+}
+
+pub fn get_storage_health() -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::get_storage_health()
+    }
+    #[cfg(not(windows))]
+    {
+        not_windows("windows.storage_health", false)
+    }
+}
+
+pub fn get_driver_info() -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::get_driver_info()
+    }
+    #[cfg(not(windows))]
+    {
+        not_windows("windows.driver_check", false)
+    }
+}
+
+pub fn get_display() -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::get_display()
+    }
+    #[cfg(not(windows))]
+    {
+        not_windows("windows.display_refresh", false)
+    }
+}
+
+pub fn set_display_refresh(reason: Option<&str>) -> SettingReport {
+    #[cfg(windows)]
+    {
+        win::set_display_refresh(reason.unwrap_or(""))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = reason;
+        not_windows("windows.display_refresh", false)
+    }
+}
+
+/// Register Windows action handlers for headless restore-all (HZ-020--HZ-022).
 pub fn register_windows_actions(registry: &mut hertzline_core::restore::MapActionRegistry) {
     #[cfg(windows)]
     {
         use hertzline_core::actions::windows::{
-            background::os::OsBackgroundAppsBackend, game_mode::os::OsGameModeBackend,
+            background::os::OsBackgroundAppsBackend, cleanup::os::OsCleanupBackend,
+            display::os::OsDisplayBackend, drivers::os::OsDriversBackend,
+            game_bar::os::OsGameBarBackend, game_mode::os::OsGameModeBackend,
             hags::os::OsHagsBackend, power_plan::os::OsPowerPlanBackend,
             priority::os::OsProcessPriorityBackend, startup::os::OsStartupAppsBackend,
-            BackgroundAppsAction, GameModeAction, HagsAction, PowerPlanAction,
-            ProcessPriorityAction, StartupAppsAction,
+            storage::os::OsStorageBackend, BackgroundAppsAction, CleanupAction,
+            DisplayRefreshAction, DriverCheckAction, GameBarAction, GameModeAction, HagsAction,
+            PowerPlanAction, ProcessPriorityAction, StartupAppsAction, StorageHealthAction,
         };
         registry.insert(Box::new(PowerPlanAction::high_performance(
             OsPowerPlanBackend,
@@ -773,6 +1134,13 @@ pub fn register_windows_actions(registry: &mut hertzline_core::restore::MapActio
         registry.insert(Box::new(StartupAppsAction::disable(
             OsStartupAppsBackend,
             "",
+        )));
+        registry.insert(Box::new(GameBarAction::disable(OsGameBarBackend)));
+        registry.insert(Box::new(CleanupAction::confirmed(OsCleanupBackend)));
+        registry.insert(Box::new(StorageHealthAction::new(OsStorageBackend)));
+        registry.insert(Box::new(DriverCheckAction::new(OsDriversBackend)));
+        registry.insert(Box::new(DisplayRefreshAction::report_only(
+            OsDisplayBackend,
         )));
     }
     #[cfg(not(windows))]
@@ -842,6 +1210,43 @@ mod tests {
         {
             assert_eq!(pri.status, "not_possible");
             assert_eq!(startup.status, "not_possible");
+        }
+    }
+
+    #[test]
+    fn hz022_ops_shape() {
+        let bar = get_game_bar();
+        assert_eq!(bar.setting, "windows.game_bar_capture");
+        let preview = preview_cleanup();
+        assert_eq!(preview.setting, "windows.temp_shader_cleanup");
+        let storage = get_storage_health();
+        assert_eq!(storage.setting, "windows.storage_health");
+        let drivers = get_driver_info();
+        assert_eq!(drivers.setting, "windows.driver_check");
+        let display = get_display();
+        assert_eq!(display.setting, "windows.display_refresh");
+        let denied = apply_cleanup(Some("no"));
+        assert_eq!(denied.setting, "windows.temp_shader_cleanup");
+        #[cfg(windows)]
+        {
+            assert!(bar.status == "ok" || bar.status == "failed");
+            assert!(preview.status == "ok" || preview.status == "failed");
+            assert!(preview.value.contains("total=") || preview.status == "failed");
+            assert!(storage.status == "ok" || storage.status == "failed");
+            assert!(storage.value.contains("smart=unavailable") || storage.status == "failed");
+            assert!(drivers.status == "ok" || drivers.status == "failed");
+            assert!(display.status == "ok" || display.status == "failed");
+            assert!(display.value.contains("vrr=unavailable") || display.status == "failed");
+            assert_eq!(denied.status, "failed");
+            assert!(denied.detail.contains("confirm"));
+        }
+        #[cfg(not(windows))]
+        {
+            assert_eq!(bar.status, "not_possible");
+            assert_eq!(preview.status, "not_possible");
+            assert_eq!(storage.status, "not_possible");
+            assert_eq!(drivers.status, "not_possible");
+            assert_eq!(display.status, "not_possible");
         }
     }
 }
