@@ -1,5 +1,7 @@
 # Helper CI. Actions pinned to commit SHAs (REPOS.md / RULES.md).
+# Hertzline/.github pin: f4f947f31a5da82d0ca4828917490d2a1d1217b0 (HZ-003 / HZ-056).
 # Checks out Hertzline/core as a sibling for the path dependency.
+# license-audit in reusable-ci is false: path dep needs sibling checkout first.
 name: ci
 
 on:
@@ -12,8 +14,17 @@ permissions:
   contents: read
 
 jobs:
+  shared:
+    uses: Hertzline/.github/.github/workflows/reusable-ci.yml@f4f947f31a5da82d0ca4828917490d2a1d1217b0
+    with:
+      meta-ref: f4f947f31a5da82d0ca4828917490d2a1d1217b0
+      pin-check: true
+      license-audit: false
+      has-secrets: false
+
   helper-test:
     name: helper-test (${{ matrix.os }})
+    needs: [shared]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -44,6 +55,15 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
           toolchain: stable
+
+      - name: HZ-056 hardening gate
+        run: python scripts/check_hz056.py
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --version 0.20.2 --locked
+
+      - name: License audit (cargo deny check licenses)
+        run: cargo deny check licenses
 
       - name: HZ-055 threat model + audit gate
         run: python scripts/check_hz055.py

@@ -1,0 +1,33 @@
+# cargo-deny 0.20.2 -- licenses for Hertzline/helper (MIT distribution).
+# Verified against EmbarkStudios cargo-deny docs; re-checked HZ-056 2026-11-15.
+# CI runs: cargo deny check licenses (after sibling Hertzline/core checkout).
+
+[graph]
+targets = [
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.8
+unused-allowed-license = "allow"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "CC0-1.0",
+    "OpenSSL",
+    "MPL-2.0",
+]
+
+[licenses.private]
+ignore = true
