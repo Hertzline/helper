@@ -458,4 +458,40 @@ mod tests {
             assert!(!set.accepted);
         }
     }
+
+    #[test]
+    fn hz055_allow_list_exhaustive_and_rejects_shell_ops() {
+        assert!(HelperOp::ALL.len() >= 30);
+        for op in HelperOp::ALL {
+            assert_eq!(HelperOp::from_token(op.as_token()), Some(*op));
+        }
+        for bad in [
+            "run_shell",
+            "exec",
+            "cmd",
+            "powershell",
+            "bash",
+            "bcdedit",
+            "disable_defender",
+            "inject",
+            "write_process_memory",
+            "rm_rf_root",
+        ] {
+            assert!(parse_op_token(bad).is_err(), "{bad}");
+        }
+        let elev: Vec<_> = HelperOp::ALL
+            .iter()
+            .copied()
+            .filter(|op| op.requires_elevation())
+            .collect();
+        assert_eq!(
+            elev,
+            vec![
+                HelperOp::RestoreAll,
+                HelperOp::CreateRestorePoint,
+                HelperOp::SetHags,
+                HelperOp::SetNiceIonice,
+            ]
+        );
+    }
 }

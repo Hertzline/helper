@@ -9,12 +9,16 @@ Named operations only. No arbitrary shell. The desktop app never runs fully elev
 | Path | Role |
 |---|---|
 | `crates/hertzline-helper` | Allow-list broker library + `hertzline-helper` binary |
+| `docs/THREAT_MODEL.md` | HZ-055 threat model (helper/core/app) |
+| `docs/HZ055_AUDIT.md` | HZ-055 audit evidence |
+| `scripts/check_hz055.py` | Automated security audit gate |
 | `policy/linux/` | Draft polkit action file for packaging |
 | `spikes/D2.md` | HZ-005 privileged helper decision evidence |
 
 ## Build
 
 ```bash
+python scripts/check_hz055.py
 cargo test --locked
 cargo build --release --locked
 ```

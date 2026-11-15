@@ -34,10 +34,19 @@ jobs:
           repository: Hertzline/core
           path: core
 
+      - name: Checkout app sibling (HZ-055 audit when present)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Hertzline/app
+          path: app
+
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
           toolchain: stable
+
+      - name: HZ-055 threat model + audit gate
+        run: python scripts/check_hz055.py
 
       - name: Test
         run: cargo test --locked
